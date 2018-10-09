@@ -1,0 +1,294 @@
+﻿https://github.com/cefsharp/CefSharp/wiki/Frequently-asked-questions
+https://github.com/cefsharp/CefSharp/wiki/Output-files-description-table-(Redistribution)
+https://github.com/cefsharp/CefSharp.MinimalExample
+https://stackoverflow.com/questions/36095566/cefsharp-3-set-proxy-at-runtime
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////
+
+public WebView web_view;
+
+public Form1()
+{
+     InitializeComponent();
+     web_view = new WebView("http://localhost:8084/wsmill",new CefSharp.BrowserSettings());
+     web_view.Dock = DockStyle.Fill;
+     toolStripContainer1.ContentPanel.Controls.Add(web_view);
+     CefSharp.CEF.Initialize(new Settings());
+}
+
+you need to put these files
+
+libcef.dll
+icudtl.dat
+CefSharp.dll
+CefSharp.WinForms.dll
+
+into your bin\Debug (or bin\Release base on your configuration)
+
+And please do not forget to install Visual C++ 2012 Redistribution ( Visual C++ 2013 Redistributable since version 43), 
+if you don't Visual Studio will always display an exception tell not found CefSharp.dll although you already have it!
+
+string dir = AppDomain.CurrentDomain.BaseDirectory;
+var missingDeps = CefSharp.DependencyChecker.CheckDependencies(true, false, dir, string.Empty, Path.Combine(dir, "CefSharp.BrowserSubprocess.exe"));
+if (missingDeps?.Count > 0)
+	throw new InvalidOperationException("Missing components:\r\n  " + string.Join("\r\n  ", missingDeps));
+// ReSharper disable once UnusedVariable
+var browser = new CefSharp.Wpf.ChromiumWebBrowser(); //test, if browser can be instantiated
+	
+//////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////
+public class CefSharpSchemeHandlerFactory : ISchemeHandlerFactory
+{
+	public const string SchemeName = "custom";
+
+	private static readonly IDictionary<string, string> ResourceDictionary;
+
+	static CefSharpSchemeHandlerFactory()
+	{
+		ResourceDictionary = new Dictionary<string, string>
+		{
+			{ "/home.html", Resources.home_html },
+			{ "/bootstrap/bootstrap.min.css", Resources.bootstrap_min_css },
+			{ "/bootstrap/bootstrap.min.js", Resources.bootstrap_min_js },
+			{ "/BindingTest.html", Resources.BindingTest },
+			{ "/ExceptionTest.html", Resources.ExceptionTest },
+			{ "/PopupTest.html", Resources.PopupTest },
+			{ "/SchemeTest.html", Resources.SchemeTest }
+		};
+	}
+
+	public IResourceHandler Create(IBrowser browser, IFrame frame, string schemeName, IRequest request)
+	{
+		//Notes:
+		// - The 'host' portion is entirely ignored by this scheme handler.
+		// - If you register a ISchemeHandlerFactory for http/https schemes you should also specify a domain name
+		// - Avoid doing lots of processing in this method as it will affect performance.
+		// - Uses the Default ResourceHandler implementation
+
+		var uri = new Uri(request.Url);
+		var fileName = uri.AbsolutePath;
+
+		string resource;
+		if (ResourceDictionary.TryGetValue(fileName, out resource) && !string.IsNullOrEmpty(resource))
+		{
+			var fileExtension = Path.GetExtension(fileName);
+			return ResourceHandler.FromString(resource, fileExtension);
+		}
+
+		return null;
+	}
+}
+
+ResourceHandler.FromStream(stream, mimeType);
+ResourceHandler.FromString(htmlString, includePreamble:true, mimeType:ResourceHandler.GetMimeType(fileExtension));
+ResourceHandler.FromFilePath("CefSharp.Core.xml", mimeType);
+
+public static void Init()
+{
+	// Pseudo code; you probably need more in your CefSettings also.
+	var settings = new CefSettings();
+
+	settings.RegisterScheme(new CefCustomScheme
+	{
+		SchemeName = "custom",
+		SchemeHandlerFactory = new CefSharpSchemeHandlerFactory()
+	});
+
+	Cef.Initialize(settings);
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////
+
+browser.LoadingStateChanged += OnLoadingStateChanged;
+
+//A slightly more complicated example
+private void OnLoadingStateChanged(object sender, LoadingStateChangedEventArgs args)
+{
+	//Wait for the Page to finish loading
+	if (args.IsLoading == false)
+	{
+		const string script = @"(function()
+    					{
+	    					var linksArray = new Array();
+	    					for (var i = 0; i < document.links.length; i++)
+	    					{
+	    						linksArray[i] = [String(document.links[i].innerHTML),
+	    								String(document.links[i].innerText),
+	    								String(document.links[i].href)];
+	    					}
+	    					return linksArray;
+    					})();";
+
+		browser.EvaluateScriptAsync(script).ContinueWith(x =>
+		{
+			var response = x.Result;
+
+			if (response.Success && response.Result != null)
+			{
+				var list = (List<object>)response.Result;
+				//Do something here (To interact with the UI you must call BeginInvoke)
+			}      
+		});
+	}
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////
+
+browser.LoadingStateChanged += OnLoadingStateChanged;
+
+//A very basic example
+private void OnLoadingStateChanged(object sender, LoadingStateChangedEventArgs args)
+{
+	//Wait for the Page to finish loading
+	if (args.IsLoading == false)
+	{
+		//Reccomended to use an anon closure
+		const string script = @"(function()
+    					{
+	    					return 1 + 1;
+    					})();";
+
+		browser.EvaluateScriptAsync(script).ContinueWith(x =>
+		{
+			var response = x.Result;
+
+			if (response.Success && response.Result != null)
+			{
+				var onePlusOne = (int)response.Result;
+				//Do something here (To interact with the UI you must call BeginInvoke)
+			}      
+		});
+	}
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////
+
+//Load the pepper flash player that comes with Google Chrome - may be possible to load these values from the registry and query the DLL for it's version info (Step 2 not strictly required it seems)
+var cefSettings = new CefSettings();
+cefSettings.CefCommandLineArgs.Add("ppapi-flash-path", @"C:\Program Files (x86)\Google\Chrome\Application\47.0.2526.106\PepperFlash\pepflashplayer.dll"); //Load a specific pepper flash version (Step 1 of 2)
+cefSettings.CefCommandLineArgs.Add("ppapi-flash-version", "20.0.0.228"); //Load a specific pepper flash version (Step 2 of 2)
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////
+
+browser.ShowDevTools();
+
+var settings = new CefSettings();
+settings.RemoteDebuggingPort = 8088;
+Cef.Initialize(settings);
+
+Open http://localhost:8088 in Chrome.
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////
+
+Load URL with PostData
+Use IFrame.LoadRequest, here is a basic example
+public void LoadCustomRequestExample()
+{
+	var frame = WebBrowser.GetMainFrame();
+
+	//Create a new request knowing we'd like to use PostData
+	var request = frame.CreateRequest(initializePostData:true);
+	request.Method = "POST";
+	request.Url = "custom://cefsharp/PostDataTest.html";
+	request.PostData.AddData("test=123&data=456");
+
+	frame.LoadRequest(request);
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////
+
+SPELL_CHECKING
+
+By default CefSettings.Locale will dictate which dictionary is used, the default being en-US. It is possible to configure many aspects of spell checking enable/disable on the fly, change dictionary on the fly, even enable multiple dictionaries. Use RequestContext.SetPreference (See the RequestContext section of this document for details on how to set a preference).
+
+Spellcheck can only be changed dynamically using spellcheck.dictionaries preference (important to use the plural version) 
+
+https://bitbucket.org/chromiumembedded/cef/issues/2222/spell-checking-language-cannot-be-changed#comment-38338016
+
+Here are some userful links
+
+http://magpcss.org/ceforum/viewtopic.php?f=6&t=14911&p=33882&hilit=spellcheck#p33882 
+https://cs.chromium.org/chromium/src/components/spellcheck/browser/pref_names.cc?type=cs&q=%22spellcheck.dictionary%22&l=11 
+https://cs.chromium.org/chromium/src/components/spellcheck/browser/pref_names.cc?type=cs&q=%22spellcheck.dictionary%22&l=15
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////
+
+CefSettings settings = new CefSettings();
+settings.CachePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CefSharp\\Cache");
+string rootPath = FileUtility.GetAssemblyPath();
+settings.BrowserSubprocessPath = Path.Combine(rootPath, "CefSharp.BrowserSubprocess.exe");
+settings.LocalesDirPath = Path.Combine(rootPath, "locales");
+settings.ResourcesDirPath = Path.Combine(rootPath);
+Cef.EnableHighDPISupport();
+//settings.CefCommandLineArgs.Add("disable-gpu", "1");
+Cef.Initialize(settings, performDependencyCheck: true, browserProcessHandler: null);
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////
+
+Required components:
+
+* CEF core library
+    libcef.dll
+
+* Unicode support
+    icudtl.dat
+
+Optional components:
+
+* Localized resources
+    locales/
+  Note: Contains localized strings for WebKit UI controls. A .pak file is loaded
+  from this folder based on the CefSettings.locale value. Only configured
+  locales need to be distributed. If no locale is configured the default locale
+  of "en-US" will be used. Locale file loading can be disabled completely using
+  CefSettings.pack_loading_disabled. The locales folder path can be customized
+  using CefSettings.locales_dir_path.
+
+* Other resources
+    cef.pak
+    cef_100_percent.pak
+    cef_200_percent.pak
+    devtools_resources.pak
+  Note: Contains WebKit image and inspector resources. Pack file loading can be
+  disabled completely using CefSettings.pack_loading_disabled. The resources
+  directory path can be customized using CefSettings.resources_dir_path.
+
+* FFmpeg audio and video support
+    ffmpegsumo.dll
+  Note: Without this component HTML5 audio and video will not function.
+
+* Angle and Direct3D support
+    d3dcompiler_43.dll (required for Windows XP)
+    d3dcompiler_47.dll (required for Windows Vista and newer)
+    libEGL.dll
+    libGLESv2.dll
+  Note: Without these components HTML5 accelerated content like 2D canvas, 3D
+  CSS and WebGL will not function.
+
+* Windows Vista 64-bit sandbox support (32-bit distributions only)
+    wow_helper.exe
+  Note: Without this component the 32-bit build of CEF will not run on 64-bit
+  Vista machines with the sandbox enabled.
